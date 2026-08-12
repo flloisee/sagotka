@@ -35,8 +35,10 @@ export function ShareLinkModal({
 
   if (!form) return null;
 
-  const fillUrl = `${window.location.origin}/f/${form.id}`;
-  const aliasUrl = form.alias ? `${window.location.origin}/f/${form.alias}` : null;
+  const origin = window.location.origin;
+  const originPath = origin.replace(/^https?:\/\//, '');
+  const fillUrl = `${origin}/f/${form.id}`;
+  const aliasUrl = form.alias ? `${origin}/f/${form.alias}` : null;
   const displayUrl = aliasUrl ?? fillUrl;
 
   const copy = () => {
@@ -87,7 +89,7 @@ export function ShareLinkModal({
     <Modal open={open} onClose={onClose} onEnter={copy} title="Share this form">
       <p className="text-sm text-ink-2">Anyone with this link can fill it in:</p>
       <div className="mt-3 flex items-center gap-2">
-        <Input readOnly value={displayUrl} onFocus={(e) => e.target.select()} />
+        <Input readOnly value={displayUrl} onFocus={(e) => e.target.select()} className="min-w-0" />
         <Button onClick={copy}>Copy</Button>
       </div>
 
@@ -97,7 +99,7 @@ export function ShareLinkModal({
             Custom short link
           </label>
           <div className="mt-1.5 flex items-center gap-2">
-            <span className="label-mono shrink-0 text-muted">{window.location.origin}/f/</span>
+            <span className="label-mono min-w-0 truncate text-muted">{originPath}/f/</span>
             <Input
               id="alias-input"
               value={aliasInput}
@@ -105,6 +107,7 @@ export function ShareLinkModal({
               placeholder="e.g. team-lunch"
               maxLength={50}
               autoComplete="off"
+              className="min-w-0"
             />
             <Button size="sm" variant="secondary" onClick={saveAlias} loading={aliasSaving}>
               {form.alias ? 'Update' : 'Save'}

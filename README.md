@@ -29,6 +29,7 @@ Built with React 19, Express 5, and SQLite (via Node's built-in `node:sqlite`), 
 | --- | --- |
 | **Form builder** | 12 question types (short answer, paragraph, multiple choice, true/false, checkboxes, dropdown, email, number, date, file upload, section break, rating), drag-and-drop reordering, question duplication, and a live preview split pane. |
 | **Publish & share** | Publish any form to get a public fill link anyone can open, no account needed. |
+| **URL aliases** | Give a form a friendly, optional alias (`my-survey`) that replaces the UUID in the public link — `/f/my-survey` instead of `/f/<uuid>`. Aliases are unique, lowercase, alphanumeric with hyphens, up to 50 characters. |
 | **Responses** | Summary view with per-question answer distributions, plus an individual response list with full answers and per-response deletion. |
 | **Quiz mode** | Turn any form into a scored quiz with correct answers, per-question points, optional time limits, shuffled options, required fullscreen, and results shown to respondents on demand. |
 | **Anti-cheat telemetry** | Quiz sessions record tab switches, fullscreen exits, and copy attempts; suspicious submissions are flagged and surfaced on the response detail view. |
@@ -48,7 +49,7 @@ SagotKa is a complete forms app with three distinct surfaces:
 | --- | --- | --- |
 | **Dashboard** | `/` | Search, open, share, duplicate, and delete your forms; see response counts and open/closed status. |
 | **Editor** | `/forms/:id` | Build questions, configure settings, preview, and publish. Autosaves every change. |
-| **Fill** | `/f/:id` | The public, chrome-free respondent experience with progress rail and per-question validation. |
+| **Fill** | `/f/:id` | The public, chrome-free respondent experience with progress rail and per-question validation. The form's alias can be used in place of the id (`/f/:alias`). |
 | **Responses** | `/forms/:id/responses` | Summary charts and individual responses, including quiz scores and anti-cheat flags. |
 
 ---
@@ -199,6 +200,7 @@ All JSON endpoints live under `/api`. Errors are returned as `{ "error": "messag
 | PUT | `/api/forms/:id` | Update title, description, settings, or questions. Validated with zod. |
 | DELETE | `/api/forms/:id` | Delete a form (owner only; cascades to responses/answers). |
 | POST | `/api/forms/:id/duplicate` | Duplicate a form as a new copy owned by the caller. |
+| PUT | `/api/forms/:id/alias` | Set or clear the form's link alias (`{ alias: string | null }`); owner only, returns 409 if the alias is already in use. |
 | GET | `/api/forms/:id/shares` | List users the form is shared with (owner only). |
 | POST | `/api/forms/:id/shares` | Share the form with a user by email (owner only). |
 | DELETE | `/api/forms/:id/shares/:userId` | Revoke a share (owner only). |
@@ -209,6 +211,8 @@ All JSON endpoints live under `/api`. Errors are returned as `{ "error": "messag
 Form access is governed by `canAccessForm` (owner, share recipient, or legacy owner-less form). Shared collaborators can view and edit the form, duplicate it, and view or delete responses; only the owner can delete the form and manage the share list.
 
 ### Public fill & quiz endpoints (no auth)
+
+Every `/api/f/*` identifier below accepts either the form's UUID **or its alias** (`/api/f/my-survey` works wherever `/api/f/<uuid>` does).
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -238,7 +242,7 @@ Uploaded files are stored in `server/uploads/` and served publicly at `/uploads/
 | --- | --- | --- |
 | `users` | id, email (UNIQUE), password_hash, created_at | argon2id password hashes. |
 | `sessions` | token (PK), user_id (FK), created_at, expires_at | 30-day lifetime; checked on every authed request. |
-| `forms` | id, title, description, settings, questions, owner_id (FK, nullable), created_at, updated_at | `settings` and `questions` are JSON text. |
+| `forms` | id, alias (UNIQUE value), title, description, settings, questions, owner_id (FK, nullable), created_at, updated_at | `settings` and `questions` are JSON text. `alias` is an optional, unique public link alias (lowercase alphanumeric + hyphens, must not be a UUID). |
 | `form_shares` | form_id (FK), user_id (FK), created_at | Composite PK; grants shared access to a form. |
 | `responses` | id, form_id (FK, cascade), edit_token (UNIQUE), score (JSON), flags (JSON), created_at, updated_at | `score`/`flags` columns added by migration. |
 | `answers` | id, response_id (FK, cascade), question_id, value | `value` is the JSON-serialized answer. |
