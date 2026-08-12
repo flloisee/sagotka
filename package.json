@@ -1,0 +1,25 @@
+{
+  "name": "sagotka",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @sagotka/server\" \"npm run dev -w @sagotka/web\"",
+    "build": "npm run build -w @sagotka/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "start": "npm run start -w @sagotka/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.3": true
+  }
+}
