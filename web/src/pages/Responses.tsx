@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, BarChart3, CheckCircle2, ChevronDown, ListOrdered, ShieldAlert, Trash2, XCircle } from 'lucide-react';
-import type { Form, FormResponse, QuizFlags, Summary } from '@sagotka/shared';
+import { gradeQuestion, type AnswerValue, type Form, type FormResponse, type Question, type QuizFlags } from '@sagotka/shared';
 import { api } from '../api';
 import { Badge, Button, IconButton, Modal, Spinner, useToasts } from '../components/ui';
 import { formatAnswer, formatDateTime } from '../lib';
 
 export function Responses() {
   const { id } = useParams();
-  const [summary, setSummary] = useState<Summary | null>(null);
   const [responses, setResponses] = useState<FormResponse[] | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [tab, setTab] = useState<'summary' | 'individual'>('summary');
@@ -19,10 +18,9 @@ export function Responses() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.summary(id!), api.listResponses(id!), api.getForm(id!)])
-      .then(([s, r, f]) => {
+    Promise.all([api.listResponses(id!), api.getForm(id!)])
+      .then(([r, f]) => {
         if (cancelled) return;
-        setSummary(s);
         setResponses(r);
         setForm(f);
       })
@@ -34,7 +32,7 @@ export function Responses() {
     };
   }, [id]);
 
-  const responseCount = summary?.responseCount ?? 0;
+  const responseCount = responses?.length ?? 0;
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -42,7 +40,6 @@ export function Responses() {
     try {
       await api.deleteResponse(id!, toDelete.id);
       setResponses((prev) => prev?.filter((r) => r.id !== toDelete.id) ?? null);
-      api.summary(id!).then(setSummary).catch(() => push('Could not update summary.', 'error'));
       push('Response deleted.');
     } catch {
       push('Could not delete response.', 'error');
@@ -79,14 +76,14 @@ export function Responses() {
 
       {error ? (
         <p className="text-sm text-danger">{error}</p>
-      ) : !summary || !responses || !form ? (
+      ) : !responses || !form ? (
         <div className="flex justify-center py-24">
           <Spinner />
         </div>
       ) : responseCount === 0 ? (
         <EmptyResponses />
       ) : tab === 'summary' ? (
-        <SummaryView summary={summary} />
+        <ChartsView responses={responses} form={form} />
       ) : (
         <IndividualView responses={responses} form={form} onDelete={setToDelete} />
       )}
@@ -145,77 +142,388 @@ function EmptyResponses() {
   );
 }
 
-function SummaryView({ summary }: { summary: Summary }) {
+function isEmpty(v: AnswerValue): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
+
+function ChartsView({ responses, form }: { responses: FormResponse[]; form: Form }) {
   return (
     <div className="flex flex-col gap-4">
-      {summary.questions.map((q) => (
-        <section key={q.questionId} className="rounded-card border border-rule bg-paper p-5 shadow-card sm:p-6">
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-[15px] font-semibold tracking-tight">{q.title}</h3>
-            <span className="label-mono shrink-0 text-muted">
-              {q.correctCount !== undefined ? (
-                <>
-                  {q.correctCount} correct · {q.answered} answered · {q.skipped} skipped
-                </>
-              ) : (
-                <>
-                  {q.answered} answered · {q.skipped} skipped
-                </>
-              )}
-            </span>
-          </div>
+      {form.questions
+        .filter((q) => q.type !== 'section_break')
+        .map((q) => (
+          <ChartCard key={q.id} question={q} responses={responses} quiz={form.settings.quiz} />
+        ))}
+    </div>
+  );
+}
 
-          {q.totalPoints !== undefined ? (
-            <div className="mt-1 flex items-baseline justify-between text-sm">
-              <span className="label-mono text-muted">
-                {q.earnedPoints ?? 0} / {q.totalPoints} points earned
-              </span>
-            </div>
-          ) : null}
+function ChartCard({
+  question: q,
+  responses,
+  quiz,
+}: {
+  question: Question;
+  responses: FormResponse[];
+  quiz: boolean;
+}) {
+  const values = responses
+    .map((r) => r.answers[q.id] ?? null)
+    .filter((v): v is AnswerValue => v !== undefined);
+  const answered = values.filter((v) => !isEmpty(v));
+  const answeredCount = answered.length;
+  const skipped = responses.length - answeredCount;
+  const pct = (n: number) => (answeredCount > 0 ? Math.round((n / answeredCount) * 100) : 0);
 
-          {q.choiceStats ? (
-            <div className="mt-5 flex flex-col gap-3.5">
-              {q.choiceStats.map((opt) => (
-                <div key={opt.optionId}>
-                  <div className="mb-1 flex items-baseline justify-between gap-3">
-                    <span className="text-sm text-ink-2">{opt.label}</span>
-                    <span className="label-mono text-muted">
-                      {opt.count} · {opt.percent}%
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-pill bg-paper-3">
-                    <div
-                      className="h-full rounded-pill bg-accent transition-all duration-700 ease-out-expo"
-                      style={{ width: `${opt.percent}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+  const graded = quiz ? answered.map((v) => gradeQuestion(q, v)) : null;
+  const scored = graded?.filter((g) => g.correct !== null);
+  const correctCount = graded?.filter((g) => g.correct === true).length;
+  const totalPoints = scored && scored.length > 0 ? scored.reduce((s, g) => s + g.points, 0) : undefined;
+  const earnedPoints = scored && scored.length > 0 ? scored.reduce((s, g) => s + g.earned, 0) : undefined;
+
+  let content: React.ReactNode;
+  if (answeredCount === 0) {
+    content = <span className="text-sm text-muted">No answers yet.</span>;
+  } else if (q.type === 'multiple_choice' || q.type === 'dropdown' || q.type === 'true_false') {
+    content = (
+      <DonutChart
+        total={answeredCount}
+        segments={q.options
+          .map((o) => ({ label: o.label, count: answered.filter((v) => v === o.id).length }))
+          .filter((s) => s.count > 0)
+          .map((s) => ({ ...s, percent: pct(s.count) }))}
+      />
+    );
+  } else if (q.type === 'checkbox') {
+    content = (
+      <div className="flex flex-col gap-3.5">
+        {q.options.map((o, i) => {
+          const count = answered.filter((v) => Array.isArray(v) && (v as string[]).includes(o.id)).length;
+          return <HBar key={o.id} label={o.label} count={count} percent={pct(count)} color={chartColor(i)} />;
+        })}
+      </div>
+    );
+  } else if (q.type === 'rating') {
+    content = <RatingChart q={q} answered={answered} pct={pct} />;
+  } else if (q.type === 'number') {
+    content = <NumberChart answered={answered} pct={pct} />;
+  } else if (q.type === 'date') {
+    content = <DateChart answered={answered} pct={pct} />;
+  } else if (q.type === 'email' || q.type === 'short_text' || q.type === 'paragraph') {
+    content = <TextChart answered={answered} pct={pct} />;
+  } else if (q.type === 'file_upload') {
+    content = <UploadStat answered={answered} />;
+  } else {
+    content = null;
+  }
+
+  return (
+    <section className="rounded-card border border-rule bg-paper p-5 shadow-card sm:p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-[15px] font-semibold tracking-tight">{q.title}</h3>
+        <span className="label-mono shrink-0 text-muted">
+          {correctCount !== undefined ? (
+            <>
+              {correctCount} correct · {answeredCount} answered · {skipped} skipped
+            </>
           ) : (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {q.recentValues.length === 0 ? (
-                <span className="text-sm text-muted">No answers yet.</span>
-              ) : (
-                q.recentValues.map((v, i) => (
-                  <span
-                    key={i}
-                    className="rounded-pill bg-paper-2 px-3 py-1 text-sm text-ink-2"
-                  >
-                    {typeof v === 'string'
-                      ? v
-                      : q.type === 'rating' && typeof v === 'number' && Number.isInteger(v) && v > 0
-                        ? '★'.repeat(v)
-                        : JSON.stringify(v)}
-                  </span>
-                ))
-              )}
-            </div>
+            <>
+              {answeredCount} answered · {skipped} skipped
+            </>
           )}
-        </section>
+        </span>
+      </div>
+
+      {totalPoints !== undefined ? (
+        <div className="mt-1 flex items-baseline justify-between text-sm">
+          <span className="label-mono text-muted">
+            {earnedPoints ?? 0} / {totalPoints} points earned
+          </span>
+        </div>
+      ) : null}
+
+      <div className="mt-5">{content}</div>
+    </section>
+  );
+}
+
+function RatingChart({
+  q,
+  answered,
+  pct,
+}: {
+  q: Question;
+  answered: AnswerValue[];
+  pct: (n: number) => number;
+}) {
+  const max = q.settings?.max ?? 5;
+  const nums = answered.filter((v): v is number => typeof v === 'number');
+  const avg = nums.length ? nums.reduce((s, v) => s + v, 0) / nums.length : 0;
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-semibold tabular-nums">{avg.toFixed(2)}</span>
+        <span className="label-mono text-muted">avg / {max}</span>
+      </div>
+      <DonutChart
+        total={nums.length}
+        segments={Array.from({ length: max }, (_, i) => i + 1)
+          .map((n) => ({
+            label: n === 1 ? '1 star' : `${n} stars`,
+            count: nums.filter((v) => v === n).length,
+          }))
+          .filter((s) => s.count > 0)
+          .map((s) => ({ ...s, percent: pct(s.count) }))}
+      />
+    </div>
+  );
+}
+
+function NumberChart({ answered, pct }: { answered: AnswerValue[]; pct: (n: number) => number }) {
+  const nums = answered.filter((v): v is number => typeof v === 'number');
+  const distinct = Array.from(new Set(nums));
+  const BIN_COUNT = 8;
+  let rows: { label: string; count: number }[];
+  if (distinct.length <= 12) {
+    rows = distinct
+      .sort((a, b) => a - b)
+      .map((v) => ({ label: String(v), count: nums.filter((x) => x === v).length }));
+  } else {
+    const min = Math.min(...nums);
+    const max = Math.max(...nums);
+    const width = (max - min) / BIN_COUNT;
+    const bins = Array.from({ length: BIN_COUNT }, (_, i) => {
+      const lo = min + i * width;
+      const hi = i === BIN_COUNT - 1 ? max : min + (i + 1) * width;
+      return { label: `${fmtNum(lo)}–${fmtNum(hi)}`, count: 0 };
+    });
+    for (const v of nums) {
+      bins[Math.min(BIN_COUNT - 1, Math.floor((v - min) / width))].count++;
+    }
+    rows = bins.filter((b) => b.count > 0);
+  }
+  const maxCount = Math.max(...rows.map((r) => r.count));
+  return (
+    <div className="flex flex-col gap-3.5">
+      {rows.map((r, i) => (
+        <HBar
+          key={r.label}
+          label={r.label}
+          count={r.count}
+          percent={pct(r.count)}
+          width={Math.round((r.count / maxCount) * 100)}
+          color={chartColor(i)}
+        />
       ))}
     </div>
   );
+}
+
+function DateChart({ answered, pct }: { answered: AnswerValue[]; pct: (n: number) => number }) {
+  const dates = answered.map((v) => String(v));
+  const rows = Array.from(new Set(dates))
+    .sort((a, b) => (a < b ? -1 : 1))
+    .map((d) => ({ label: d, count: dates.filter((x) => x === d).length }));
+  const maxCount = Math.max(...rows.map((r) => r.count));
+  return (
+    <div className="flex flex-col gap-3.5">
+      {rows.map((r, i) => (
+        <HBar
+          key={r.label}
+          label={r.label}
+          count={r.count}
+          percent={pct(r.count)}
+          width={Math.round((r.count / maxCount) * 100)}
+          color={chartColor(i)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TextChart({ answered, pct }: { answered: AnswerValue[]; pct: (n: number) => number }) {
+  const buckets = new Map<string, number>();
+  for (const v of answered) {
+    const key = String(v).trim();
+    if (!key) continue;
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  const rows = [...buckets.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  const top = rows.slice(0, 10);
+  const rest = rows.length - top.length;
+  const maxCount = Math.max(1, ...top.map((r) => r.count));
+  if (top.length === 0) {
+    return <span className="text-sm text-muted">No answers yet.</span>;
+  }
+  return (
+    <div className="flex flex-col gap-3.5">
+      {top.map((r, i) => (
+        <HBar
+          key={r.label}
+          label={r.label}
+          count={r.count}
+          percent={pct(r.count)}
+          width={Math.round((r.count / maxCount) * 100)}
+          color={chartColor(i)}
+        />
+      ))}
+      {rest > 0 ? (
+        <span className="label-mono text-muted">+ {rest} more unique answers</span>
+      ) : null}
+    </div>
+  );
+}
+
+function UploadStat({ answered }: { answered: AnswerValue[] }) {
+  const files = answered.reduce<number>((s, v) => s + (Array.isArray(v) ? v.length : 0), 0);
+  return (
+    <div className="flex items-center gap-10">
+      <div>
+        <div className="text-2xl font-semibold tabular-nums">{files}</div>
+        <div className="label-mono mt-0.5 text-muted">files uploaded</div>
+      </div>
+      <div>
+        <div className="text-2xl font-semibold tabular-nums">{answered.length}</div>
+        <div className="label-mono mt-0.5 text-muted">responses with files</div>
+      </div>
+    </div>
+  );
+}
+
+interface DonutSegment {
+  label: string;
+  count: number;
+  percent: number;
+}
+
+const CHART_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
+];
+
+function chartColor(i: number): string {
+  return CHART_COLORS[i % CHART_COLORS.length];
+}
+
+function donutColor(i: number, other: boolean): string {
+  if (other) return 'var(--muted)';
+  return chartColor(i);
+}
+
+function DonutChart({ segments, total }: { segments: DonutSegment[]; total: number }) {
+  const sorted = [...segments].sort((a, b) => b.count - a.count);
+  const hasBig = sorted.some((s) => s.percent >= 2);
+  const smalls = sorted.filter((s) => s.percent < 2);
+  const smallPct = smalls.reduce((s, x) => s + x.percent, 0);
+  const slices: (DonutSegment & { other?: boolean })[] =
+    hasBig && smallPct > 0
+      ? [
+          ...sorted.filter((s) => s.percent >= 2),
+          { label: 'Other', count: smalls.reduce((s, x) => s + x.count, 0), percent: smallPct, other: true },
+        ]
+      : sorted;
+
+  const R = 40;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+
+  return (
+    <div className="flex flex-col items-center gap-6 sm:flex-row">
+      <div className="relative size-36 shrink-0">
+        <svg
+          viewBox="0 0 100 100"
+          className="size-full -rotate-90"
+          role="img"
+          aria-label={slices.map((s) => `${s.label}: ${s.count}`).join(', ')}
+        >
+          {slices.map((s, i) => {
+            const len = Math.max(0, (s.percent / 100) * C);
+            const el = (
+              <circle
+                key={`${s.label}-${i}`}
+                cx="50"
+                cy="50"
+                r={R}
+                fill="none"
+                strokeWidth={15}
+                stroke={donutColor(i, s.other ?? false)}
+                strokeDasharray={`${len} ${C - len}`}
+                strokeDashoffset={-acc}
+              >
+                <title>{`${s.label}: ${s.count}`}</title>
+              </circle>
+            );
+            acc += len;
+            return el;
+          })}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-semibold tabular-nums leading-none">{total}</span>
+          <span className="label-mono mt-1 text-muted">answered</span>
+        </div>
+      </div>
+      <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
+        {slices.map((s, i) => (
+          <li key={`${s.label}-${i}`} className="flex items-center gap-2.5 text-sm">
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: donutColor(i, s.other ?? false) }}
+            />
+            <span className="min-w-0 flex-1 truncate text-ink-2">{s.label}</span>
+            <span className="label-mono shrink-0 text-muted">
+              {s.count} · {s.percent}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function HBar({
+  label,
+  count,
+  percent,
+  width,
+  color,
+}: {
+  label: string;
+  count: number;
+  percent: number;
+  width?: number;
+  color?: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-sm text-ink-2">{label}</span>
+        <span className="label-mono shrink-0 text-muted">
+          {count} · {percent}%
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-pill bg-paper-3">
+        <div
+          className="h-full rounded-pill transition-all duration-700 ease-out-expo"
+          style={{ width: `${width ?? percent}%`, background: color ?? 'var(--accent)' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function fmtNum(n: number): string {
+  return n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
 }
 
 function IndividualView({

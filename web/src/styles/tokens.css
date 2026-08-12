@@ -44,6 +44,14 @@
   --danger: oklch(52% 0.2 25);
   --success: oklch(48% 0.14 150);
   --focus: oklch(64% 0.165 28);
+  --chart-1: oklch(62% 0.18 28);
+  --chart-2: oklch(58% 0.16 245);
+  --chart-3: oklch(58% 0.15 150);
+  --chart-4: oklch(72% 0.16 70);
+  --chart-5: oklch(56% 0.17 300);
+  --chart-6: oklch(57% 0.12 190);
+  --chart-7: oklch(62% 0.18 350);
+  --chart-8: oklch(56% 0.17 268);
   --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter,
     "Helvetica Neue", Arial, sans-serif;
   --font-label: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
@@ -70,6 +78,14 @@
   --focus: oklch(70% 0.15 28);
   --shadow-card: 0 1px 2px oklch(0% 0 0 / 0.4), 0 4px 16px oklch(0% 0 0 / 0.35);
   --shadow-lift: 0 2px 4px oklch(0% 0 0 / 0.45), 0 12px 32px oklch(0% 0 0 / 0.4);
+  --chart-1: oklch(72% 0.17 28);
+  --chart-2: oklch(72% 0.15 245);
+  --chart-3: oklch(72% 0.14 150);
+  --chart-4: oklch(72% 0.14 70);
+  --chart-5: oklch(72% 0.17 300);
+  --chart-6: oklch(70% 0.12 190);
+  --chart-7: oklch(72% 0.17 350);
+  --chart-8: oklch(70% 0.16 268);
 }
 
 @layer base {
