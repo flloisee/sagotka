@@ -242,7 +242,7 @@ export function Editor() {
   return (
     <div className="pb-24">
       <header className="sticky top-0 z-40 border-b border-rule bg-paper/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:gap-3 sm:px-6">
           <Link
             to="/"
             aria-label="Back to dashboard"
@@ -279,9 +279,20 @@ export function Editor() {
             <Eye className="size-4" />
             <span className="hidden md:inline">Preview</span>
           </Button>
-          <Button size="sm" onClick={publish} success={form.settings.published}>
-            {form.settings.published ? <CheckCircle2 className="size-4" /> : <LinkIcon className="size-4" />}
-            {form.settings.published ? 'Published' : 'Publish'}
+          <Button
+            size="sm"
+            onClick={publish}
+            success={form.settings.published}
+            title={form.settings.published ? 'Published' : 'Publish'}
+          >
+            {form.settings.published ? (
+              <CheckCircle2 className="size-4" aria-hidden />
+            ) : (
+              <LinkIcon className="size-4" aria-hidden />
+            )}
+            <span className="hidden sm:inline">
+              {form.settings.published ? 'Published' : 'Publish'}
+            </span>
           </Button>
         </div>
         {previewOn ? (
@@ -327,7 +338,7 @@ export function Editor() {
 
           {previewOn ? (
             <div className={`mt-10 lg:mt-0 ${mobileTab === 'preview' ? 'block' : 'hidden lg:block'}`}>
-              <div className="lg:sticky lg:top-24">
+              <div className="lg:sticky lg:top-[calc(6rem+env(safe-area-inset-top))]">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="label-mono text-muted">Live preview</p>
                   <span className="label-mono text-muted">Updated {formatDate(form.updatedAt)}</span>

@@ -299,7 +299,7 @@ export function useToasts() {
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   };
   const el = toasts.length ? (
-    <div className="pointer-events-none fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2">
+    <div className="pointer-events-none fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 z-[60] flex max-w-[92vw] -translate-x-1/2 flex-col items-center gap-2">
       {toasts.map((t) => (
         <div
           key={t.id}

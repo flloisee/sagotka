@@ -486,7 +486,7 @@ function RatingControl({
   onChange: (n: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
         <button
           key={n}
@@ -951,13 +951,13 @@ function QuizFill({
       className="rounded-card border border-rule bg-paper shadow-card select-none"
     >
       <div className="flex flex-col gap-2 border-b border-rule px-6 pb-4 pt-5 sm:px-8">
-        <div className="flex items-center justify-between text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
           <span className="label-mono">
             {realPos >= 0
               ? `Question ${realPos + 1} of ${realQuestions.length}`
               : 'Section'}
           </span>
-          <span className="flex items-center gap-4">
+          <span className="flex flex-wrap items-center gap-4">
             {remainingMs !== null && timeLimitSeconds > 0 ? (
               <span
                 className={`label-mono flex items-center gap-1.5 ${

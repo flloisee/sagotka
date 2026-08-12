@@ -222,9 +222,9 @@ function ChartCard({
 
   return (
     <section className="rounded-card border border-rule bg-paper p-5 shadow-card sm:p-6">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h3 className="text-[15px] font-semibold tracking-tight">{q.title}</h3>
-        <span className="label-mono shrink-0 text-muted">
+        <span className="label-mono text-muted">
           {correctCount !== undefined ? (
             <>
               {correctCount} correct · {answeredCount} answered · {skipped} skipped
@@ -563,7 +563,7 @@ function ResponseCard({
           className="flex w-full items-center justify-between gap-3 py-4 text-left"
           aria-expanded={open}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {response.score ? (
               <Badge tone="accent">
                 {response.score.earnedPoints} / {response.score.totalPoints}

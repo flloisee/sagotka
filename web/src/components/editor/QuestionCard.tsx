@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, Copy, GripVertical, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, GripVertical, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FIELD_TYPE_LABELS, QUIZ_TYPES, migrateQuestionType, type FieldType, type Question } from '@sagotka/shared';
-import { IconButton, Switch, Input } from '../ui';
+import { IconButton, Switch, Input, Modal } from '../ui';
 import { OptionsEditor } from './OptionsEditor';
 import { ICONS } from './AddQuestion';
 
@@ -25,16 +25,100 @@ export function QuestionCard({ question: q, isQuiz = false, onChange, onDuplicat
     transition,
   };
 
+  const [actionsOpen, setActionsOpen] = useState(false);
+
   if (q.type === 'section_break') {
     return (
+      <>
+        <div
+          ref={setNodeRef}
+          style={style}
+          className={`rounded-card border border-l-[3px] border-l-accent bg-paper shadow-card ${
+            isDragging ? 'border-accent opacity-80' : 'border-rule'
+          }`}
+        >
+          <div className="flex items-center gap-3 px-5 py-4">
+            <button
+              {...attributes}
+              {...listeners}
+              aria-label="Drag to reorder"
+              className="cursor-grab touch-none text-rule-2 hover:text-muted active:cursor-grabbing"
+            >
+              <GripVertical className="size-4.5" />
+            </button>
+            <TypePicker question={q} isQuiz={isQuiz} onChange={onChange} />
+            <div className="ml-auto lg:hidden">
+              <button
+                type="button"
+                aria-label="More actions"
+                aria-haspopup="dialog"
+                onClick={() => setActionsOpen(true)}
+                className="inline-flex size-9 items-center justify-center rounded-full text-neutral transition-colors hover:bg-paper-3 hover:text-ink"
+              >
+                <MoreHorizontal className="size-4.5" />
+              </button>
+            </div>
+            <div className="ml-auto hidden lg:flex shrink-0 items-center gap-0.5">
+              <IconButton label="Duplicate question" onClick={onDuplicate}>
+                <Copy className="size-4" />
+              </IconButton>
+              <IconButton label="Delete question" onClick={onDelete}>
+                <Trash2 className="size-4" />
+              </IconButton>
+            </div>
+          </div>
+          <div className="px-6 pb-5">
+            <EditableTitle
+              value={q.title}
+              placeholder="Section title"
+              onChange={(v) => onChange({ title: v })}
+            />
+            <EditableDescription
+              value={q.description}
+              onChange={(v) => onChange({ description: v })}
+            />
+          </div>
+        </div>
+        <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title="Section actions">
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                onDuplicate();
+                setActionsOpen(false);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-input px-2 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-paper-3 hover:text-ink"
+            >
+              <Copy className="size-4" />
+              Duplicate question
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDelete();
+                setActionsOpen(false);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-input px-2 py-2 text-left text-sm text-danger transition-colors hover:bg-danger/10"
+            >
+              <Trash2 className="size-4" />
+              Delete question
+            </button>
+          </div>
+        </Modal>
+      </>
+    );
+  }
+
+  return (
+    <>
       <div
         ref={setNodeRef}
         style={style}
-        className={`rounded-card border bg-paper shadow-card ${
+        className={`rounded-card border bg-paper shadow-card transition-shadow ${
           isDragging ? 'border-accent opacity-80' : 'border-rule'
         }`}
       >
-        <div className="flex items-center gap-3 border-l-[3px] border-accent px-5 py-4">
+        <div className="flex items-center gap-3 px-5 pt-4">
           <button
             {...attributes}
             {...listeners}
@@ -44,7 +128,23 @@ export function QuestionCard({ question: q, isQuiz = false, onChange, onDuplicat
             <GripVertical className="size-4.5" />
           </button>
           <TypePicker question={q} isQuiz={isQuiz} onChange={onChange} />
-          <div className="ml-auto flex items-center gap-0.5">
+          <div className="ml-auto lg:hidden">
+            <button
+              type="button"
+              aria-label="More actions"
+              aria-haspopup="dialog"
+              onClick={() => setActionsOpen(true)}
+              className="inline-flex size-9 items-center justify-center rounded-full text-neutral transition-colors hover:bg-paper-3 hover:text-ink"
+            >
+              <MoreHorizontal className="size-4.5" />
+            </button>
+          </div>
+          <div className="ml-auto hidden lg:flex shrink-0 items-center gap-2">
+            <Switch
+              checked={q.required}
+              onChange={(v) => onChange({ required: v })}
+              label="Required"
+            />
             <IconButton label="Duplicate question" onClick={onDuplicate}>
               <Copy className="size-4" />
             </IconButton>
@@ -53,67 +153,51 @@ export function QuestionCard({ question: q, isQuiz = false, onChange, onDuplicat
             </IconButton>
           </div>
         </div>
-        <div className="px-6 pb-5">
+
+        <div className="px-5 pb-5 pt-3">
           <EditableTitle
             value={q.title}
-            placeholder="Section title"
+            placeholder="Question"
             onChange={(v) => onChange({ title: v })}
           />
           <EditableDescription
             value={q.description}
             onChange={(v) => onChange({ description: v })}
           />
+          <TypeSettings question={q} isQuiz={isQuiz} onChange={onChange} />
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`rounded-card border bg-paper shadow-card transition-shadow ${
-        isDragging ? 'border-accent opacity-80' : 'border-rule'
-      }`}
-    >
-      <div className="flex items-center gap-3 px-5 pt-4">
-        <button
-          {...attributes}
-          {...listeners}
-          aria-label="Drag to reorder"
-          className="cursor-grab touch-none text-rule-2 hover:text-muted active:cursor-grabbing"
-        >
-          <GripVertical className="size-4.5" />
-        </button>
-        <TypePicker question={q} isQuiz={isQuiz} onChange={onChange} />
-        <div className="ml-auto flex items-center gap-2">
-          <Switch
-            checked={q.required}
-            onChange={(v) => onChange({ required: v })}
-            label="Required"
-          />
-          <IconButton label="Duplicate question" onClick={onDuplicate}>
+      <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title="Question actions">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-3 px-2 py-2">
+            <span className="text-sm text-ink-2">Required</span>
+            <Switch checked={q.required} onChange={(v) => onChange({ required: v })} />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onDuplicate();
+              setActionsOpen(false);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-input px-2 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-paper-3 hover:text-ink"
+          >
             <Copy className="size-4" />
-          </IconButton>
-          <IconButton label="Delete question" onClick={onDelete}>
+            Duplicate question
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDelete();
+              setActionsOpen(false);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-input px-2 py-2 text-left text-sm text-danger transition-colors hover:bg-danger/10"
+          >
             <Trash2 className="size-4" />
-          </IconButton>
+            Delete question
+          </button>
         </div>
-      </div>
-
-      <div className="px-5 pb-5 pt-3">
-        <EditableTitle
-          value={q.title}
-          placeholder="Question"
-          onChange={(v) => onChange({ title: v })}
-        />
-        <EditableDescription
-          value={q.description}
-          onChange={(v) => onChange({ description: v })}
-        />
-        <TypeSettings question={q} isQuiz={isQuiz} onChange={onChange} />
-      </div>
-    </div>
+      </Modal>
+    </>
   );
 }
 
@@ -184,12 +268,12 @@ function TypePicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="label-mono inline-flex h-7 items-center gap-1.5 rounded-input border border-transparent bg-paper-2 pl-2 pr-6 text-muted transition-colors duration-150 hover:border-rule hover:text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+        className="label-mono inline-flex h-7 min-w-0 max-w-[11rem] items-center gap-1.5 rounded-input border border-transparent bg-paper-2 pl-2 pr-6 text-muted transition-colors duration-150 hover:border-rule hover:text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
       >
         <span aria-hidden="true" className="text-[13px] leading-none text-neutral">
           {ICONS[q.type]}
         </span>
-        {FIELD_TYPE_LABELS[q.type]}
+        <span className="truncate min-w-0">{FIELD_TYPE_LABELS[q.type]}</span>
         <ChevronDown aria-hidden="true" className="absolute right-1.5 size-3.5" />
       </button>
 

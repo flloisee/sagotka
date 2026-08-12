@@ -36,7 +36,7 @@ export function AppBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 px-4 pt-4 sm:px-6">
+    <header className="sticky top-0 z-40 px-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-6">
       <div className="mx-auto flex max-w-6xl items-center justify-between rounded-pill border border-rule bg-paper/80 px-3 py-2 shadow-card backdrop-blur-md sm:px-4">
         <Logo className="rounded-full px-2 py-1 transition-colors hover:bg-paper-3" />
 
