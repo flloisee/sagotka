@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
-  getForm,
+  getFormByIdentifier,
   getResponseByToken,
   createResponse,
   updateResponse,
@@ -17,6 +17,7 @@ import {
   validateAnswers,
   gradeQuiz,
   randomId,
+  type Form,
   type PublicForm,
   type QuizFlags,
   type QuizGrade,
@@ -41,7 +42,7 @@ function getOrCreateRespondent(req: Request, res: Response): string {
   return id;
 }
 
-function toPublicForm(form: NonNullable<ReturnType<typeof getForm>>): PublicForm {
+function toPublicForm(form: Form): PublicForm {
   return {
     id: form.id,
     title: form.title,
@@ -64,7 +65,7 @@ function toPublicForm(form: NonNullable<ReturnType<typeof getForm>>): PublicForm
 }
 
 publicRouter.get('/f/:id', (req, res) => {
-  const form = getForm(req.params.id);
+  const form = getFormByIdentifier(req.params.id);
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }
@@ -75,7 +76,7 @@ publicRouter.get('/f/:id', (req, res) => {
 });
 
 publicRouter.post('/f/:id/quiz/start', (req, res) => {
-  const form = getForm(req.params.id);
+  const form = getFormByIdentifier(req.params.id);
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }
@@ -90,7 +91,7 @@ publicRouter.post('/f/:id/quiz/start', (req, res) => {
 });
 
 publicRouter.post('/f/:id/responses', (req, res) => {
-  const form = getForm(req.params.id);
+  const form = getFormByIdentifier(req.params.id);
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }
@@ -147,7 +148,7 @@ publicRouter.post('/f/:id/responses', (req, res) => {
 });
 
 publicRouter.get('/f/:id/responses/:rid', (req, res) => {
-  const form = getForm(req.params.id);
+  const form = getFormByIdentifier(req.params.id);
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }
@@ -166,7 +167,7 @@ publicRouter.get('/f/:id/responses/:rid', (req, res) => {
 });
 
 publicRouter.put('/f/:id/responses/:rid', (req, res) => {
-  const form = getForm(req.params.id);
+  const form = getFormByIdentifier(req.params.id);
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }

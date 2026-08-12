@@ -26,6 +26,7 @@ interface FormRow {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  alias: string | null;
 }
 
 interface ResponseRow {
@@ -54,6 +55,7 @@ function parseForm(row: FormRow): Form {
     ownerId: row.owner_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    alias: row.alias || null,
   };
 }
 
@@ -108,6 +110,28 @@ export function getForm(id: string): Form | null {
   return row ? parseForm(row) : null;
 }
 
+export function getFormByIdentifier(identifier: string): Form | null {
+  const byId = getForm(identifier);
+  if (byId) return byId;
+  return getFormByAlias(identifier);
+}
+
+export function getFormByAlias(alias: string): Form | null {
+  const row = db
+    .prepare('SELECT * FROM forms WHERE alias = ?')
+    .get(alias) as FormRow | undefined;
+  return row ? parseForm(row) : null;
+}
+
+export function setFormAlias(formId: string, alias: string | null): boolean {
+  if (alias !== null) {
+    const existing = getFormByAlias(alias);
+    if (existing && existing.id !== formId) return false;
+  }
+  db.prepare('UPDATE forms SET alias = ? WHERE id = ?').run(alias, formId);
+  return true;
+}
+
 export function createForm(input: {
   title: string;
   ownerId: string | null;
@@ -124,6 +148,7 @@ export function createForm(input: {
     ownerId: input.ownerId,
     createdAt: now,
     updatedAt: now,
+    alias: null,
   };
   db.prepare(
     `INSERT INTO forms (id, title, description, settings, questions, owner_id, created_at, updated_at)
@@ -189,6 +214,7 @@ export function duplicateForm(id: string, ownerId: string): Form | null {
     ownerId,
     createdAt: now,
     updatedAt: now,
+    alias: null,
   };
   db.prepare(
     `INSERT INTO forms (id, title, description, settings, questions, owner_id, created_at, updated_at)

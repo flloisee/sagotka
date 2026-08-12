@@ -96,6 +96,11 @@ export const api = {
     request<void>(`/api/forms/${formId}/responses/${responseId}`, { method: 'DELETE' }),
   duplicateForm: (id: string) =>
     request<Form>(`/api/forms/${id}/duplicate`, { method: 'POST' }),
+  setAlias: (id: string, alias: string | null) =>
+    request<Form>(`/api/forms/${id}/alias`, {
+      method: 'PUT',
+      body: JSON.stringify({ alias }),
+    }),
 
   getPublicForm: (id: string) => request<PublicForm>(`/api/f/${id}`),
   startQuizSession: (id: string) =>

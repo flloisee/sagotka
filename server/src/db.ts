@@ -98,6 +98,11 @@ if (!formColumns.some((c) => c.name === 'owner_id')) {
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_forms_owner ON forms(owner_id)');
 
+if (!formColumns.some((c) => c.name === 'alias')) {
+  db.exec('ALTER TABLE forms ADD COLUMN alias TEXT');
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_forms_alias ON forms(alias)');
+
 const shareColumns = db.prepare('PRAGMA table_info(form_shares)').all() as { name: string }[];
 if (!shareColumns.some((c) => c.name === 'created_at')) {
   db.exec('ALTER TABLE form_shares ADD COLUMN created_at TEXT NOT NULL DEFAULT ""');

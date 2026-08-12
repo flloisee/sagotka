@@ -15,9 +15,15 @@ import {
   unshareForm,
   listShares,
   getUserByEmail,
+  setFormAlias,
 } from '../repo.js';
 import { buildSummary } from '../summary.js';
-import { createFormSchema, formUpdateSchema, shareByEmailSchema } from '@sagotka/shared';
+import {
+  createFormSchema,
+  formUpdateSchema,
+  shareByEmailSchema,
+  setFormAliasSchema,
+} from '@sagotka/shared';
 import { requireAuth, type AuthedRequest } from '../auth.js';
 
 export const formsRouter = Router();
@@ -96,6 +102,25 @@ formsRouter.post('/forms/:id/duplicate', (req: AuthedRequest, res) => {
   const copy = duplicateForm(formId(req), req.userId!);
   if (!copy) return notFound(res);
   res.status(201).json(copy);
+});
+
+// ---------- link alias (owner-only) ----------
+
+formsRouter.put('/forms/:id/alias', (req: AuthedRequest, res) => {
+  if (accessDenied(req, res, formId(req))) return;
+  if (!isFormOwner(req.userId!, formId(req))) return forbidden(res);
+  const parsed = setFormAliasSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return res.status(422).json({ error: first?.message ?? 'Invalid alias.' });
+  }
+  const alias = parsed.data.alias;
+  if (!setFormAlias(formId(req), alias)) {
+    return res.status(409).json({ error: 'This link alias is already in use.' });
+  }
+  const form = getForm(formId(req));
+  if (!form) return notFound(res);
+  res.json(form);
 });
 
 // ---------- sharing (owner-only) ----------

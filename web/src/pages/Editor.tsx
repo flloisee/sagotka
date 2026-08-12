@@ -21,7 +21,6 @@ import {
   PenLine,
   Settings2,
   Link as LinkIcon,
-  XCircle,
 } from 'lucide-react';
 import {
   newQuestion,
@@ -35,6 +34,7 @@ import { Button, IconButton, Input, Modal, Switch, Textarea, useToasts } from '.
 import { QuestionCard } from '../components/editor/QuestionCard';
 import { AddQuestion } from '../components/editor/AddQuestion';
 import { FillForm } from '../components/FillForm';
+import { ShareLinkModal } from '../components/ShareLinkModal';
 import { formatDate } from '../lib';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -344,16 +344,16 @@ export function Editor() {
         </div>
       </main>
 
-      <ShareModal
+      <ShareLinkModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         form={form}
+        onUpdate={setForm}
         onUnpublish={() => {
           patchSettings({ published: false });
           setShareOpen(false);
           push('Form unpublished.');
         }}
-        onCopy={() => push('Fill link copied.')}
       />
 
       <SettingsModal
@@ -416,62 +416,6 @@ function TabButton({
     >
       {children}
     </button>
-  );
-}
-
-function ShareModal({
-  open,
-  onClose,
-  form,
-  onUnpublish,
-  onCopy,
-}: {
-  open: boolean;
-  onClose: () => void;
-  form: Form;
-  onUnpublish: () => void;
-  onCopy: () => void;
-}) {
-  const fillUrl = `${window.location.origin}/f/${form.id}`;
-
-  const copy = () => {
-    navigator.clipboard?.writeText(fillUrl).catch(() => {});
-    onCopy();
-  };
-
-  if (!form.settings.published) {
-    return (
-      <Modal open={open} onClose={onClose} onEnter={onClose} title="Almost there">
-        <p className="text-sm text-ink-2">
-          This form isn&apos;t published yet. Publishing creates a public fill link
-          that anyone can open.
-        </p>
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </Modal>
-    );
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} onEnter={copy} title="Share this form">
-      <p className="text-sm text-ink-2">Anyone with this link can fill it in:</p>
-      <div className="mt-3 flex items-center gap-2">
-        <Input readOnly value={fillUrl} onFocus={(e) => e.target.select()} />
-        <Button onClick={copy}>
-          Copy
-        </Button>
-      </div>
-      <div className="mt-5 flex items-center gap-2 rounded-input bg-paper-2 px-3.5 py-3">
-        <XCircle className="size-4.5 shrink-0 text-danger" />
-        <span className="text-sm text-ink-2">Stop collecting responses and unpublish.</span>
-        <button onClick={onUnpublish} className="ml-auto shrink-0 text-sm font-medium text-danger hover:underline">
-          Unpublish
-        </button>
-      </div>
-    </Modal>
   );
 }
 

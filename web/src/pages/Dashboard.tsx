@@ -5,6 +5,7 @@ import type { FormListItem, ShareGrant } from '@sagotka/shared';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { formatDate } from '../lib';
+import { ShareLinkModal } from '../components/ShareLinkModal';
 import {
   Badge,
   Button,
@@ -23,6 +24,7 @@ export function Dashboard() {
   const [toDelete, setToDelete] = useState<FormListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [shareForm, setShareForm] = useState<FormListItem | null>(null);
+  const [linkForm, setLinkForm] = useState<FormListItem | null>(null);
   const navigate = useNavigate();
   const { toasts, push } = useToasts();
 
@@ -61,13 +63,7 @@ export function Dashboard() {
   };
 
   const copyLink = (form: FormListItem) => {
-    if (!form.settings.published) {
-      push('Publish the form to copy its fill link.', 'error');
-      return;
-    }
-    const url = `${window.location.origin}/f/${form.id}`;
-    navigator.clipboard?.writeText(url).catch(() => {});
-    push('Responses link copied.');
+    setLinkForm(form);
   };
 
   return (
@@ -149,6 +145,17 @@ export function Dashboard() {
         isOpen={!!shareForm}
         onClose={() => setShareForm(null)}
       />
+
+      <ShareLinkModal
+        open={!!linkForm}
+        onClose={() => setLinkForm(null)}
+        form={linkForm}
+        onUpdate={(updated) =>
+          setForms((prev) =>
+            prev?.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)) ?? null,
+          )
+        }
+      />
     </main>
   );
 }
@@ -217,7 +224,7 @@ function FormCard({
               <IconButton label="Share" onClick={(e) => { e.stopPropagation(); onShare(); }}>
                 <Share2 className="size-4" />
               </IconButton>
-              <IconButton label="Copy responses link" onClick={(e) => { e.stopPropagation(); onCopy(); }}>
+              <IconButton label="Share link" onClick={(e) => { e.stopPropagation(); onCopy(); }}>
                 <Copy className="size-4" />
               </IconButton>
               <IconButton label="Delete" onClick={(e) => { e.stopPropagation(); onDelete(); }}>

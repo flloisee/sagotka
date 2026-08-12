@@ -69,6 +69,7 @@ export interface Form {
   ownerId: string | null;
   createdAt: string;
   updatedAt: string;
+  alias: string | null;
 }
 
 export interface FormListItem extends Form {
@@ -342,6 +343,7 @@ export function newForm(title = 'Untitled form'): Form {
     ownerId: null,
     createdAt: now,
     updatedAt: now,
+    alias: null,
   };
 }
 
@@ -468,6 +470,24 @@ export const resetPasswordSchema = z.object({
 
 export const shareByEmailSchema = z.object({
   email: emailSchema,
+});
+
+const aliasSchema = z
+  .string()
+  .trim()
+  .max(50)
+  .transform((v) => v.toLowerCase())
+  .refine(
+    (v) => /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/.test(v),
+    'Use lowercase letters, numbers, and hyphens.',
+  )
+  .refine(
+    (v) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v),
+    'This alias is reserved.',
+  );
+
+export const setFormAliasSchema = z.object({
+  alias: z.union([aliasSchema, z.null()]),
 });
 
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
