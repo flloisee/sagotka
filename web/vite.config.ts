@@ -17,8 +17,8 @@ export default defineConfig({
     port: 5173,
     allowedHosts: ['harmonics-preamble-occupancy.ngrok-free.dev'],
     proxy: {
-      '/api': 'http://localhost:8787',
-      '/uploads': 'http://localhost:8787',
+      '/api': { target: 'http://localhost:8787', changeOrigin: false },
+      '/uploads': { target: 'http://localhost:8787', changeOrigin: false },
     },
   },
 });

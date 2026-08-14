@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { useAuth } from '../auth';
-import { executeCaptcha, captchaSiteKey } from '../recaptcha';
 import { Button, ErrorText, Field, Input } from '../components/ui';
 import { Logo } from '../components/Logo';
 
@@ -25,8 +24,7 @@ export function Register() {
     setError('');
     setSending(true);
     try {
-      const token = captchaSiteKey() ? await executeCaptcha('register') : undefined;
-      await api.requestOtp(email, 'verify_email', token);
+      await api.requestOtp(email, 'verify_email');
       setCodeSent(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong.');
@@ -44,9 +42,12 @@ export function Register() {
     }
     setVerifying(true);
     try {
-      const token = captchaSiteKey() ? await executeCaptcha('register') : undefined;
-      await api.verifyOtp(email, code, token);
-      setCodeVerified(true);
+      const { verified } = await api.verifyOtp(email, code);
+      if (verified) {
+        setCodeVerified(true);
+      } else {
+        setError('Invalid or expired verification code.');
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong.');
     } finally {
@@ -72,8 +73,7 @@ export function Register() {
     }
     setLoading(true);
     try {
-      const token = captchaSiteKey() ? await executeCaptcha('register') : undefined;
-      const { user } = await api.register(email, password, code, token);
+      const { user } = await api.register(email, password, code);
       setUser(user);
       navigate('/');
     } catch (err) {

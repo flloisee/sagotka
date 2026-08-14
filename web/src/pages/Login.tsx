@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { useAuth } from '../auth';
-import { executeCaptcha, captchaSiteKey } from '../recaptcha';
 import { Button, ErrorText, Field, Input } from '../components/ui';
 import { Logo } from '../components/Logo';
 
@@ -20,11 +19,9 @@ export function Login() {
     setLoading(true);
     setError('');
     try {
-      const token = captchaSiteKey() ? await executeCaptcha('login') : undefined;
       const result = await api.login(
         email,
         password,
-        token,
         withCode ? withCode : undefined,
       );
       if ('requiresOtp' in result) {

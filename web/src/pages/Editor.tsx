@@ -204,6 +204,11 @@ export function Editor() {
         timeLimitSeconds: form.settings.timeLimitSeconds,
       },
       questions: form.questions,
+      totalPoints: form.settings.quiz
+        ? form.questions
+            .filter((q) => q.type !== 'section_break')
+            .reduce((sum, q) => sum + (q.points && q.points > 0 ? q.points : 1), 0)
+        : 0,
       hasResponded: false,
     };
   }, [form]);

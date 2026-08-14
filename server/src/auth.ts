@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { getSessionUserId } from './repo.js';
 
-export const SESSION_COOKIE = 'sagotka_session';
+const IS_PROD = process.env.NODE_ENV === 'production';
+export const SESSION_COOKIE = IS_PROD ? '__Host-sagotka_session' : 'sagotka_session';
 
 export interface AuthedRequest extends Request {
   userId?: string;

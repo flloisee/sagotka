@@ -5,7 +5,6 @@ import {
   getOtpForVerify,
   getUnexpiredOtp,
   incrementOtpAttempts,
-  refreshOtp,
   deleteOtp,
   OTP_MAX_ATTEMPTS,
   OTP_TTL_MS,
@@ -23,15 +22,14 @@ async function hashCode(code: string): Promise<string> {
 }
 
 export async function issueOtp(email: string, purpose: OtpPurpose): Promise<void> {
+  const existing = getUnexpiredOtp(email, purpose);
+  if (existing) {
+    return;
+  }
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
   const codeHash = await hashCode(code);
-  const existing = getUnexpiredOtp(email, purpose);
-  if (existing) {
-    refreshOtp(existing.id, codeHash, expiresAt);
-  } else {
-    createOtp({ email, purpose, codeHash, expiresAt });
-  }
+  createOtp({ email, purpose, codeHash, expiresAt });
   await sendOtpEmail(email, code);
 }
 

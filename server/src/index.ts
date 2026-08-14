@@ -3,6 +3,7 @@ import './env.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,16 +17,79 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
 
 const app = express();
+
+// Trust X-Forwarded-For only from the local reverse proxy (ngrok dev tunnel).
+app.set('trust proxy', 'loopback');
+
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://localhost:8787',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:8787',
+  'https://harmonics-preamble-occupancy.ngrok-free.dev',
+  ...(process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+]);
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+      return cb(null, false);
+    },
     credentials: true,
+  }),
+);
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        'default-src': ["'self'"],
+        'base-uri': ["'self'"],
+        'font-src': ["'self'", 'data:'],
+        'form-action': ["'self'"],
+        'frame-ancestors': ["'self'"],
+        'img-src': ["'self'", 'data:'],
+        'object-src': ["'none'"],
+        'script-src': ["'self'"],
+        'script-src-attr': ["'none'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+      },
+    },
   }),
 );
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-app.use('/uploads', express.static(UPLOAD_DIR));
+// CSRF defense-in-depth: reject state-changing requests whose Origin does not
+// match the Host the browser addressed. SameSite=Lax remains the primary guard.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const host = req.headers.host;
+  if (
+    origin &&
+    host &&
+    origin !== `http://${host}` &&
+    origin !== `https://${host}`
+  ) {
+    res.status(403).json({ error: 'Forbidden.' });
+    return;
+  }
+  next();
+});
+
+app.use(
+  '/uploads',
+  express.static(UPLOAD_DIR, {
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'");
+      res.setHeader('Content-Disposition', 'attachment');
+    },
+  }),
+);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api', authRouter);
@@ -51,12 +115,17 @@ app.use(
     const status = typeof (err as { status?: number }).status === 'number'
       ? (err as { status: number }).status
       : 500;
-    const message =
-      status >= 500
-        ? 'Something went wrong on our side.'
-        : (err as { message?: string }).message ?? 'Request failed.';
-    if (status >= 500) console.error(err);
-    res.status(status).json({ error: message });
+    if (status >= 500) {
+      console.error(err);
+      res.status(500).json({ error: 'Something went wrong on our side.' });
+      return;
+    }
+    if (status === 429) {
+      res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      return;
+    }
+    console.error(err);
+    res.status(status).json({ error: 'Request failed.' });
   },
 );
 

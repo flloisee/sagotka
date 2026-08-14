@@ -6,22 +6,27 @@ import { api } from '../api';
 import { Badge, Button, IconButton, Modal, Spinner, useToasts } from '../components/ui';
 import { formatAnswer, formatDateTime } from '../lib';
 
+const PAGE_SIZE = 200;
+
 export function Responses() {
   const { id } = useParams();
   const [responses, setResponses] = useState<FormResponse[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [form, setForm] = useState<Form | null>(null);
   const [tab, setTab] = useState<'summary' | 'individual'>('summary');
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [toDelete, setToDelete] = useState<FormResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { toasts, push } = useToasts();
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.listResponses(id!), api.getForm(id!)])
+    Promise.all([api.listResponses(id!, { limit: PAGE_SIZE }), api.getForm(id!)])
       .then(([r, f]) => {
         if (cancelled) return;
-        setResponses(r);
+        setResponses(r.items);
+        setTotal(r.total);
         setForm(f);
       })
       .catch(() => {
@@ -32,7 +37,24 @@ export function Responses() {
     };
   }, [id]);
 
-  const responseCount = responses?.length ?? 0;
+  const responseCount = total;
+
+  const loadMore = async () => {
+    if (!responses || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await api.listResponses(id!, {
+        limit: PAGE_SIZE,
+        offset: responses.length,
+      });
+      setResponses((prev) => [...(prev ?? []), ...r.items]);
+      setTotal(r.total);
+    } catch {
+      push('Could not load more responses.', 'error');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -40,6 +62,7 @@ export function Responses() {
     try {
       await api.deleteResponse(id!, toDelete.id);
       setResponses((prev) => prev?.filter((r) => r.id !== toDelete.id) ?? null);
+      setTotal((n) => Math.max(0, n - 1));
       push('Response deleted.');
     } catch {
       push('Could not delete response.', 'error');
@@ -83,9 +106,16 @@ export function Responses() {
       ) : responseCount === 0 ? (
         <EmptyResponses />
       ) : tab === 'summary' ? (
-        <ChartsView responses={responses} form={form} />
+        <ChartsView responses={responses} form={form} total={responseCount} />
       ) : (
-        <IndividualView responses={responses} form={form} onDelete={setToDelete} />
+        <IndividualView
+          responses={responses}
+          form={form}
+          onDelete={setToDelete}
+          onLoadMore={loadMore}
+          loadingMore={loadingMore}
+          hasMore={responses.length < responseCount}
+        />
       )}
 
       {toasts}
@@ -149,9 +179,23 @@ function isEmpty(v: AnswerValue): boolean {
   return false;
 }
 
-function ChartsView({ responses, form }: { responses: FormResponse[]; form: Form }) {
+function ChartsView({
+  responses,
+  form,
+  total,
+}: {
+  responses: FormResponse[];
+  form: Form;
+  total: number;
+}) {
   return (
     <div className="flex flex-col gap-4">
+      {responses.length < total ? (
+        <p className="text-xs text-muted">
+          Charts are computed from the first {responses.length} of {total} responses. Load more
+          responses for a fuller picture.
+        </p>
+      ) : null}
       {form.questions
         .filter((q) => q.type !== 'section_break')
         .map((q) => (
@@ -530,16 +574,29 @@ function IndividualView({
   responses,
   form,
   onDelete,
+  onLoadMore,
+  loadingMore,
+  hasMore,
 }: {
   responses: FormResponse[];
   form: Form;
   onDelete: (r: FormResponse) => void;
+  onLoadMore: () => void;
+  loadingMore: boolean;
+  hasMore: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3">
       {responses.map((r) => (
         <ResponseCard key={r.id} response={r} form={form} onDelete={onDelete} />
       ))}
+      {hasMore ? (
+        <div className="flex justify-center pt-2">
+          <Button variant="secondary" onClick={onLoadMore} loading={loadingMore}>
+            Load more
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -46,30 +46,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export type LoginResult = AuthResult | { requiresOtp: true; email: string };
 
 export const api = {
-  register: (email: string, password: string, code: string, recaptchaToken?: string) =>
+  register: (email: string, password: string, code: string) =>
     request<AuthResult>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, code, recaptchaToken }),
+      body: JSON.stringify({ email, password, code }),
     }),
-  requestOtp: (email: string, purpose: OtpPurpose, recaptchaToken?: string) =>
+  requestOtp: (email: string, purpose: OtpPurpose) =>
     request<{ sent: boolean }>('/api/auth/otp/request', {
       method: 'POST',
-      body: JSON.stringify({ email, purpose, recaptchaToken }),
+      body: JSON.stringify({ email, purpose }),
     }),
-  verifyOtp: (email: string, code: string, recaptchaToken?: string) =>
+  verifyOtp: (email: string, code: string) =>
     request<{ verified: boolean }>('/api/auth/otp/verify', {
       method: 'POST',
-      body: JSON.stringify({ email, code, recaptchaToken }),
+      body: JSON.stringify({ email, code }),
     }),
-  login: (email: string, password: string, recaptchaToken?: string, code?: string) =>
+  login: (email: string, password: string, code?: string) =>
     request<LoginResult>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, code, recaptchaToken }),
+      body: JSON.stringify({ email, password, code }),
     }),
-  resetPassword: (email: string, code: string, newPassword: string, recaptchaToken?: string) =>
+  resetPassword: (email: string, code: string, newPassword: string) =>
     request<void>('/api/auth/password/reset', {
       method: 'POST',
-      body: JSON.stringify({ email, code, newPassword, recaptchaToken }),
+      body: JSON.stringify({ email, code, newPassword }),
     }),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   me: () => request<AuthResult>('/api/auth/me'),
@@ -132,7 +132,15 @@ export const api = {
       body: JSON.stringify({ token, answers }),
     }),
 
-  listResponses: (id: string) => request<FormResponse[]>(`/api/forms/${id}/responses`),
+  listResponses: (id: string, options?: { limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.offset) params.set('offset', String(options.offset));
+    const qs = params.toString();
+    return request<{ items: FormResponse[]; total: number }>(
+      `/api/forms/${id}/responses${qs ? `?${qs}` : ''}`,
+    );
+  },
   summary: (id: string) => request<Summary>(`/api/forms/${id}/summary`),
   uploadFiles: async (id: string, files: File[]): Promise<FileRef[]> => {
     const form = new FormData();

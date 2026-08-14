@@ -881,10 +881,7 @@ function QuizFill({
   submitRef.current = submit;
 
   if (phase === 'intro') {
-    const totalPoints = realQuestions.reduce(
-      (s, q) => s + ((q.points && q.points > 0 ? q.points : 1) as number),
-      0,
-    );
+    const totalPoints = form.totalPoints ?? 0;
     return (
       <div className="rounded-card border border-rule bg-paper p-8 text-center shadow-card sm:p-12">
         <p className="label-mono mb-3 text-accent">Quiz</p>
@@ -968,9 +965,6 @@ function QuizFill({
                 {formatCountdown(remainingMs)}
               </span>
             ) : null}
-            <span className="label-mono">
-              {realPos >= 0 && q.points && q.points > 0 ? `${q.points} pt` : '—'}
-            </span>
           </span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-pill bg-paper-3">
@@ -1048,7 +1042,7 @@ function QuizResults({
           const q = form.questions.find((x) => x.id === g.questionId);
           if (!q) return null;
           const yourAnswer = answerLabel(q, answers[q.id]);
-          const correctLabel = correctAnswerLabel(q);
+          const correctLabel = g.correctLabel;
           return (
             <div key={g.questionId} className="flex flex-col gap-1 py-3">
               <div className="flex items-baseline justify-between gap-3">
@@ -1088,17 +1082,4 @@ function answerLabel(q: Question, value: AnswerValue | undefined): string {
     return q.options.find((o) => o.id === value)?.label ?? String(value);
   }
   return String(value);
-}
-
-function correctAnswerLabel(q: Question): string | null {
-  if (q.type === 'multiple_choice' || q.type === 'true_false') {
-    if (!q.correctAnswer) return null;
-    return q.options.find((o) => o.id === q.correctAnswer)?.label ?? q.correctAnswer;
-  }
-  if (q.type === 'short_text' || q.type === 'paragraph') {
-    const accepted = (q.acceptedAnswers ?? []).filter(Boolean);
-    if (accepted.length === 0) return null;
-    return accepted.join(', ');
-  }
-  return null;
 }

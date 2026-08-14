@@ -96,9 +96,12 @@ export interface PublicForm {
   title: string;
   description: string;
   settings: PublicFormSettings;
-  questions: Question[];
+  questions: PublicQuestion[];
+  totalPoints: number;
   hasResponded: boolean;
 }
+
+export type PublicQuestion = Omit<Question, 'correctAnswer' | 'acceptedAnswers' | 'caseSensitive' | 'points'>;
 
 export type AnswerValue = string | string[] | number | FileRef[] | null;
 
@@ -165,6 +168,7 @@ export interface QuestionGrade {
   correct: boolean | null;
   points: number;
   earned: number;
+  correctLabel?: string | null;
 }
 
 export interface QuizGrade {
@@ -351,7 +355,7 @@ export function randomId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
   }
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  throw new Error('crypto.randomUUID is not available; refusing to generate predictable IDs.');
 }
 
 // ---------- zod schemas (server-side input validation) ----------
@@ -416,15 +420,37 @@ const quizEventSchema = z.object({
   clientTime: z.number().int(),
 });
 
+const MAX_ANSWER_KEYS = 300;
+const MAX_ANSWER_STRING_LENGTH = 50_000;
+const MAX_ANSWER_JSON_LENGTH = 2_000_000;
+
+const answersSchema = z
+  .record(z.string(), z.any())
+  .refine(
+    (answers) => {
+      const entries = Object.entries(answers);
+      if (entries.length > MAX_ANSWER_KEYS) return false;
+      let total = 0;
+      for (const [, value] of entries) {
+        if (typeof value === 'string' && value.length > MAX_ANSWER_STRING_LENGTH) return false;
+        if (Array.isArray(value) && value.length > 500) return false;
+        total += JSON.stringify(value).length;
+        if (total > MAX_ANSWER_JSON_LENGTH) return false;
+      }
+      return true;
+    },
+    { message: 'Submission is too large.' },
+  );
+
 export const submitSchema = z.object({
-  answers: z.record(z.string(), z.any()),
+  answers: answersSchema,
   quizSessionToken: z.string().min(1).optional(),
   events: z.array(quizEventSchema).max(500).optional(),
 });
 
 export const editResponseSchema = z.object({
   token: z.string().min(1),
-  answers: z.record(z.string(), z.any()),
+  answers: answersSchema,
 });
 
 // ---------- auth ----------
@@ -438,34 +464,29 @@ export type OtpPurpose = (typeof OTP_PURPOSES)[number];
 export const requestOtpSchema = z.object({
   email: emailSchema,
   purpose: z.enum(OTP_PURPOSES),
-  recaptchaToken: z.string().optional(),
 });
 
 export const verifyOtpSchema = z.object({
   email: emailSchema,
   code: otpCodeSchema,
-  recaptchaToken: z.string().optional(),
 });
 
 export const registerSchema = z.object({
   email: emailSchema,
   password: z.string().min(8).max(128),
   code: otpCodeSchema,
-  recaptchaToken: z.string().optional(),
 });
 
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().max(128),
   code: otpCodeSchema.optional(),
-  recaptchaToken: z.string().optional(),
 });
 
 export const resetPasswordSchema = z.object({
   email: emailSchema,
   code: otpCodeSchema,
   newPassword: z.string().min(8).max(128),
-  recaptchaToken: z.string().optional(),
 });
 
 export const shareByEmailSchema = z.object({
@@ -649,17 +670,34 @@ export function gradeQuestion(question: Question, answer: unknown): QuestionGrad
 
   if (question.type === 'multiple_choice' || question.type === 'true_false') {
     const correct = typeof answer === 'string' && answer === question.correctAnswer;
-    return { questionId: question.id, correct, points, earned: correct ? points : 0 };
+    const correctLabel =
+      typeof question.correctAnswer === 'string' && question.correctAnswer.length > 0
+        ? (question.options.find((o) => o.id === question.correctAnswer)?.label ??
+          question.correctAnswer)
+        : null;
+    return { questionId: question.id, correct, points, earned: correct ? points : 0, correctLabel };
   }
 
   if (question.type === 'short_text' || question.type === 'paragraph') {
     if (typeof answer !== 'string')
-      return { questionId: question.id, correct: false, points, earned: 0 };
+      return {
+        questionId: question.id,
+        correct: false,
+        points,
+        earned: 0,
+        correctLabel: accepted.length > 0 ? accepted.join(', ') : null,
+      };
     const norm = (s: string) =>
       question.caseSensitive ? s.trim() : s.trim().toLowerCase();
     const target = norm(answer);
     const correct = accepted.some((a) => norm(a) === target);
-    return { questionId: question.id, correct, points, earned: correct ? points : 0 };
+    return {
+      questionId: question.id,
+      correct,
+      points,
+      earned: correct ? points : 0,
+      correctLabel: accepted.length > 0 ? accepted.join(', ') : null,
+    };
   }
 
   return unscored;

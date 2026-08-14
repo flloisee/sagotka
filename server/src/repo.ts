@@ -1,4 +1,6 @@
-import { db } from './db.js';
+import { existsSync, unlinkSync } from 'node:fs';
+import path from 'node:path';
+import { db, UPLOAD_DIR } from './db.js';
 import {
   type Form,
   type FormListItem,
@@ -199,8 +201,69 @@ export function updateForm(
 }
 
 export function deleteForm(id: string): boolean {
+  const uploadNames = uploadNamesForForm(id);
   const res = db.prepare('DELETE FROM forms WHERE id = ?').run(id);
+  if (res.changes > 0) deleteUploadedFiles(uploadNames);
   return res.changes > 0;
+}
+
+// ---------- uploaded file cleanup ----------
+
+function uploadNamesFromAnswers(rows: { value: string }[]): string[] {
+  const names = new Set<string>();
+  for (const row of rows) {
+    try {
+      const value = JSON.parse(row.value) as unknown;
+      const refs = Array.isArray(value) ? value : [value];
+      for (const ref of refs) {
+        if (ref && typeof ref === 'object') {
+          const url = (ref as { url?: unknown }).url;
+          if (typeof url === 'string') {
+            const match = /^\/uploads\/([^/?]+)$/.exec(url);
+            if (match) names.add(match[1]);
+          }
+        }
+      }
+    } catch {
+      /* not a file answer */
+    }
+  }
+  return [...names];
+}
+
+function uploadNamesForForm(formId: string): string[] {
+  const rows = db
+    .prepare(
+      `SELECT a.value FROM answers a
+       JOIN responses r ON r.id = a.response_id
+       WHERE r.form_id = ?`,
+    )
+    .all(formId) as unknown as { value: string }[];
+  return uploadNamesFromAnswers(rows);
+}
+
+function uploadNamesForResponse(responseId: string): string[] {
+  const rows = db
+    .prepare('SELECT value FROM answers WHERE response_id = ?')
+    .all(responseId) as unknown as { value: string }[];
+  return uploadNamesFromAnswers(rows);
+}
+
+function deleteUploadedFiles(names: string[]): void {
+  for (const name of names) {
+    const stillReferenced = db
+      .prepare('SELECT 1 FROM answers WHERE value LIKE ? LIMIT 1')
+      .get(`%${name}%`);
+    if (stillReferenced) continue;
+    const filePath = path.join(UPLOAD_DIR, name);
+    if (path.dirname(filePath) === UPLOAD_DIR && existsSync(filePath)) {
+      try {
+        unlinkSync(filePath);
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+  }
 }
 
 export function duplicateForm(id: string, ownerId: string): Form | null {
@@ -358,18 +421,28 @@ export function deleteResponse(formId: string, responseId: string): boolean {
     .prepare('SELECT id FROM responses WHERE id = ? AND form_id = ?')
     .get(responseId, formId) as { id: string } | undefined;
   if (!row) return false;
+  const uploadNames = uploadNamesForResponse(responseId);
   db.prepare('DELETE FROM answers WHERE response_id = ?').run(responseId);
   const res = db.prepare('DELETE FROM responses WHERE id = ?').run(responseId);
+  if (res.changes > 0) deleteUploadedFiles(uploadNames);
   return res.changes > 0;
 }
 
-export function listResponses(formId: string): FormResponse[] {
+export function listResponses(
+  formId: string,
+  options?: { limit?: number; offset?: number },
+): { items: FormResponse[]; total: number } {
+  const limit = Math.min(Math.max(1, options?.limit ?? 200), 500);
+  const offset = Math.max(0, options?.offset ?? 0);
+  const totalRow = db
+    .prepare('SELECT COUNT(*) AS n FROM responses WHERE form_id = ?')
+    .get(formId) as { n: number };
   const rows = db
     .prepare(
-      `SELECT * FROM responses WHERE form_id = ? ORDER BY created_at DESC`,
+      `SELECT * FROM responses WHERE form_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     )
-    .all(formId) as unknown as ResponseRow[];
-  return rows.map(buildResponse);
+    .all(formId, limit, offset) as unknown as ResponseRow[];
+  return { items: rows.map(buildResponse), total: totalRow.n };
 }
 
 // ---------- quiz sessions ----------
@@ -463,11 +536,12 @@ export function createUser(email: string, passwordHash: string): User {
 }
 
 export function searchUsersByEmail(email: string, excludeId: string, limit = 10): User[] {
+  const escaped = email.replace(/[\\%_]/g, (m) => `\\${m}`);
   const rows = db
     .prepare(
-      `SELECT * FROM users WHERE email LIKE ? AND id != ? ORDER BY email LIMIT ?`,
+      `SELECT * FROM users WHERE email LIKE ? ESCAPE '\\' AND id != ? ORDER BY email LIMIT ?`,
     )
-    .all(`%${email}%`, excludeId, limit) as unknown as UserRow[];
+    .all(`%${escaped}%`, excludeId, limit) as unknown as UserRow[];
   return rows.map(parseUser);
 }
 
@@ -635,14 +709,6 @@ export function getOtpForVerify(email: string, purpose: OtpPurpose): OtpCode | n
 
 export function incrementOtpAttempts(id: string): void {
   db.prepare('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?').run(id);
-}
-
-export function refreshOtp(id: string, codeHash: string, expiresAt: string): void {
-  db.prepare('UPDATE otp_codes SET code_hash = ?, expires_at = ?, attempts = 0 WHERE id = ?').run(
-    codeHash,
-    expiresAt,
-    id,
-  );
 }
 
 export function deleteOtp(id: string): void {

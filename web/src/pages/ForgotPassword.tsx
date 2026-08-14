@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api';
-import { executeCaptcha, captchaSiteKey } from '../recaptcha';
 import { Button, ErrorText, Field, Input } from '../components/ui';
 import { Logo } from '../components/Logo';
 
@@ -22,8 +21,7 @@ export function ForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      const token = captchaSiteKey() ? await executeCaptcha('password_reset') : undefined;
-      await api.requestOtp(email, 'reset_password', token);
+      await api.requestOtp(email, 'reset_password');
       setStep('code');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong.');
@@ -50,8 +48,7 @@ export function ForgotPassword() {
     }
     setLoading(true);
     try {
-      const token = captchaSiteKey() ? await executeCaptcha('password_reset') : undefined;
-      await api.resetPassword(email, code, newPassword, token);
+      await api.resetPassword(email, code, newPassword);
       setStep('done');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong.');

@@ -11,6 +11,7 @@ import {
   completeQuizSession,
 } from '../repo.js';
 import { computeQuizFlags } from '../anticheat.js';
+import { responseLimiter, submissionLimiter, formSubmissionLimiter, quizStartLimiter } from '../ratelimit.js';
 import {
   submitSchema,
   editResponseSchema,
@@ -26,9 +27,11 @@ import {
 export const publicRouter = Router();
 
 const QUIZ_GRACE_MS = 5000;
-const RESPONDENT_COOKIE = 'sagotka_respondent';
+const IS_PROD = process.env.NODE_ENV === 'production';
+const RESPONDENT_COOKIE = IS_PROD ? '__Host-sagotka_respondent' : 'sagotka_respondent';
 const RESPONDENT_COOKIE_OPTS = {
   httpOnly: true,
+  secure: IS_PROD,
   sameSite: 'lax' as const,
   path: '/',
   maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -59,7 +62,14 @@ function toPublicForm(form: Form): PublicForm {
       limitToOneResponse: form.settings.limitToOneResponse,
       timeLimitSeconds: form.settings.timeLimitSeconds,
     },
-    questions: form.questions,
+    questions: form.questions.map(
+      ({ correctAnswer, acceptedAnswers, caseSensitive, points, ...question }) => question,
+    ),
+    totalPoints: form.settings.quiz
+      ? form.questions
+          .filter((q) => q.type !== 'section_break')
+          .reduce((sum, q) => sum + (q.points && q.points > 0 ? q.points : 1), 0)
+      : 0,
     hasResponded: false,
   };
 }
@@ -75,8 +85,8 @@ publicRouter.get('/f/:id', (req, res) => {
   res.json({ ...toPublicForm(form), hasResponded });
 });
 
-publicRouter.post('/f/:id/quiz/start', (req, res) => {
-  const form = getFormByIdentifier(req.params.id);
+publicRouter.post('/f/:id/quiz/start', submissionLimiter, quizStartLimiter, (req, res) => {
+  const form = getFormByIdentifier(String(req.params.id));
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }
@@ -90,8 +100,8 @@ publicRouter.post('/f/:id/quiz/start', (req, res) => {
   res.status(201).json({ sessionToken: session.token, startedAt: session.startedAt });
 });
 
-publicRouter.post('/f/:id/responses', (req, res) => {
-  const form = getFormByIdentifier(req.params.id);
+publicRouter.post('/f/:id/responses', responseLimiter, formSubmissionLimiter, (req, res) => {
+  const form = getFormByIdentifier(String(req.params.id));
   if (!form || !form.settings.published) {
     return res.status(404).json({ error: 'This form is not available.' });
   }

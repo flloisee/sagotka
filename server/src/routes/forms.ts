@@ -161,7 +161,14 @@ formsRouter.delete('/forms/:id/shares/:userId', (req: AuthedRequest, res) => {
 formsRouter.get('/forms/:id/responses', (req: AuthedRequest, res) => {
   if (accessDenied(req, res, formId(req))) return;
   if (!getForm(formId(req))) return notFound(res);
-  res.json(listResponses(formId(req)));
+  const limit = Number(req.query.limit ?? 200);
+  const offset = Number(req.query.offset ?? 0);
+  res.json(
+    listResponses(formId(req), {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      offset: Number.isFinite(offset) ? offset : undefined,
+    }),
+  );
 });
 
 formsRouter.get('/forms/:id/summary', (req: AuthedRequest, res) => {

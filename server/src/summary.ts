@@ -15,7 +15,7 @@ function isEmpty(v: AnswerValue): boolean {
 }
 
 export function buildSummary(form: Form): Summary {
-  const responses = listResponses(form.id);
+  const { items: responses } = listResponses(form.id);
   const total = countResponses(form.id);
 
   const summaries: QuestionSummary[] = form.questions

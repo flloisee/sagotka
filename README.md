@@ -36,7 +36,6 @@ Built with React 19, Express 5, and SQLite (via Node's built-in `node:sqlite`), 
 | **File uploads** | File-upload questions accept up to 10 files of 50 MB each, served publicly under `/uploads/`. |
 | **Collaboration** | Share a form with other users by email; collaborators can open, edit, and duplicate it and view its responses, while only the owner can delete the form or manage the share list. |
 | **Accounts & sessions** | Email + password registration with argon2id hashing and httpOnly cookie sessions. Optional OTP codes (email verification, password reset, and second-factor login) delivered via SMTP. |
-| **Optional reCAPTCHA v3** | Both the web client and server support reCAPTCHA v3; with no keys configured, verification is skipped for local development. |
 | **Dark mode** | Theme persisted in `localStorage`; a design system locked via the Hallmark process (see `design.md`) with a single coral accent and composed 150–200 ms motion that honors `prefers-reduced-motion`. |
 
 ---
@@ -129,10 +128,6 @@ Both packages read env vars from their own `.env` files. Everything is optional 
 **Server (`server/.env` — copy from `server/.env.example`):**
 
 ```bash
-# reCAPTCHA v3 server-side verification.
-# When unset, verification is skipped (dev fallback) and all auth requests pass.
-GOOGLE_RECAPTCHA_SECRET=
-
 # SMTP for OTP emails via Gmail App Passwords.
 # When unset (dev fallback), OTP codes are logged to the server console instead of emailed.
 SMTP_HOST=smtp.gmail.com
@@ -140,14 +135,6 @@ SMTP_PORT=465
 SMTP_USER=you@gmail.com
 SMTP_PASS=<16-character app password>
 SMTP_FROM=SagotKa <you@gmail.com>
-```
-
-**Web (`web/.env` — copy from `web/.env.example`):**
-
-```bash
-# reCAPTCHA v3 site key for the browser.
-# When unset (dev), the client skips reCAPTCHA and the server's dev fallback allows auth.
-VITE_RECAPTCHA_SITE_KEY=
 ```
 
 Without SMTP credentials, OTP codes are printed to the server console (look for `[otp] code for you@example.com: 123456`) instead of being emailed — handy for local development.
@@ -299,7 +286,6 @@ sagotka/
 │       ├── repo.ts              # all SQL prepared statements (forms, responses, users, sessions, otp)
 │       ├── auth.ts              # requireAuth middleware, session cookie name
 │       ├── env.ts               # loads server/.env
-│       ├── recaptcha.ts         # reCAPTCHA v3 siteverify (skipped when unconfigured)
 │       ├── otp.ts               # OTP issue/verify, 6-digit codes, TTL & attempt limits
 │       ├── mailer.ts            # nodemailer transport + branded OTP email template
 │       ├── anticheat.ts         # quiz flag computation (tabs, fullscreen, copy, duration)
@@ -319,7 +305,6 @@ sagotka/
         ├── App.tsx              # routes + auth guard
         ├── api.ts               # typed API client (fetch + credentials: include)
         ├── auth.tsx             # AuthProvider / useAuth
-        ├── recaptcha.ts         # client-side reCAPTCHA v3 (skipped when no site key)
         ├── lib.ts               # date/answer formatting helpers
         ├── styles/tokens.css    # Tailwind v4 theme tokens (light + dark)
         ├── pages/               # Dashboard, Editor, Responses, Fill, Login, Register, ForgotPassword, NotFound
@@ -337,8 +322,6 @@ sagotka/
 > **Data directories are ephemeral** — `server/data/` and `server/uploads/` are gitignored and recreated on boot. Deleting `server/data/sagotka.db` wipes all forms, users, and responses; there is no backup or export mechanism.
 
 > **External hosts / ngrok** — `web/vite.config.ts` has `server.allowedHosts` containing an ngrok domain (`harmonics-preamble-occupancy.ngrok-free.dev`). Any new external testing host must be added there or Vite will refuse connections.
-
-> **reCAPTCHA in dev** — Leave `GOOGLE_RECAPTCHA_SECRET` (server) and `VITE_RECAPTCHA_SITE_KEY` (web) unset to skip verification. Set only the server secret and the browser token won't verify, and vice versa — configure both or neither.
 
 > **OTP codes in dev** — Without SMTP credentials the server logs the code to the console (`[otp] code for …`). Enable SMTP (Gmail App Passwords are suggested in `.env.example`) to deliver codes by email and to enable the OTP second-factor on login.
 
