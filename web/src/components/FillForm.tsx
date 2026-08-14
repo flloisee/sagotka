@@ -732,7 +732,7 @@ function QuizFill({
     const map: Record<string, string[]> = {};
     if (!form.settings.shuffleOptions) return map;
     for (const q of questions) {
-      if (q.type === 'multiple_choice' || q.type === 'true_false') {
+      if (q.type === 'multiple_choice' || q.type === 'true_false' || q.type === 'checkbox') {
         map[q.id] = shuffle(q.options.map((o) => o.id));
       }
     }
@@ -1080,6 +1080,12 @@ function answerLabel(q: Question, value: AnswerValue | undefined): string {
   if (value === null || value === undefined || value === '') return '';
   if (q.type === 'multiple_choice' || q.type === 'true_false') {
     return q.options.find((o) => o.id === value)?.label ?? String(value);
+  }
+  if (q.type === 'checkbox' && Array.isArray(value)) {
+    const labels = (value as string[])
+      .map((id) => q.options.find((o) => o.id === id)?.label)
+      .filter((l): l is string => Boolean(l));
+    return labels.length > 0 ? labels.join(', ') : '—';
   }
   return String(value);
 }

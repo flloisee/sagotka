@@ -136,6 +136,7 @@ export function Editor() {
       title: `${q.title} (copy)`,
       options: q.options.map((o) => ({ ...o })),
       correctAnswer: q.correctAnswer,
+      correctAnswers: q.correctAnswers,
       acceptedAnswers: q.acceptedAnswers,
       caseSensitive: q.caseSensitive,
       points: q.points,

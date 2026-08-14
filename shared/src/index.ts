@@ -55,6 +55,7 @@ export interface Question {
   options: ChoiceOption[];
   settings?: QuestionSettings;
   correctAnswer?: string;
+  correctAnswers?: string[];
   acceptedAnswers?: string[];
   caseSensitive?: boolean;
   points?: number;
@@ -310,6 +311,7 @@ export function newQuestion(type: FieldType, quiz = false): Question {
 export const QUIZ_TYPES: FieldType[] = [
   'multiple_choice',
   'true_false',
+  'checkbox',
   'short_text',
   'paragraph',
   'section_break',
@@ -398,6 +400,7 @@ export const questionSchema = z.object({
     })
     .optional(),
   correctAnswer: z.string().max(1000).optional(),
+  correctAnswers: z.array(z.string().min(1)).max(50).optional(),
   acceptedAnswers: z.array(z.string().max(1000)).max(50).optional(),
   caseSensitive: z.boolean().optional(),
   points: z.number().int().min(0).max(1000).optional(),
@@ -663,8 +666,9 @@ export function gradeQuestion(question: Question, answer: unknown): QuestionGrad
     earned: 0,
   };
   const hasAnswer =
-    typeof question.correctAnswer === 'string' &&
-    question.correctAnswer.length > 0;
+    (typeof question.correctAnswer === 'string' &&
+      question.correctAnswer.length > 0) ||
+    (question.correctAnswers ?? []).length > 0;
   const accepted = (question.acceptedAnswers ?? []).filter((a) => a.trim().length > 0);
   if (!hasAnswer && accepted.length === 0) return unscored;
 
@@ -676,6 +680,29 @@ export function gradeQuestion(question: Question, answer: unknown): QuestionGrad
           question.correctAnswer)
         : null;
     return { questionId: question.id, correct, points, earned: correct ? points : 0, correctLabel };
+  }
+
+  if (question.type === 'checkbox') {
+    const correctIds = (question.correctAnswers ?? []).filter((id) => id.length > 0);
+    const selected = Array.isArray(answer)
+      ? answer.filter((v): v is string => typeof v === 'string')
+      : [];
+    const expected = new Set(correctIds);
+    const correct =
+      selected.length === expected.size && selected.every((id) => expected.has(id));
+    const correctLabel =
+      correctIds.length > 0
+        ? correctIds
+            .map((id) => question.options.find((o) => o.id === id)?.label ?? id)
+            .join(', ')
+        : null;
+    return {
+      questionId: question.id,
+      correct,
+      points,
+      earned: correct ? points : 0,
+      correctLabel,
+    };
   }
 
   if (question.type === 'short_text' || question.type === 'paragraph') {

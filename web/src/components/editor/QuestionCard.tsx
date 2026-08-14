@@ -438,12 +438,32 @@ function TypeSettings({
         </>
       );
     case 'dropdown':
-    case 'checkbox':
       return (
         <OptionsEditor
           options={q.options}
           onChange={(options) => onChange({ options })}
         />
+      );
+    case 'checkbox':
+      return (
+        <>
+          {isQuiz ? (
+            <p className="mt-2 text-xs text-muted">
+              Select the <span className="font-medium text-success">green checkmark</span> on
+              every correct answer.
+            </p>
+          ) : null}
+          <OptionsEditor
+            options={q.options}
+            onChange={(options) => onChange({ options })}
+            correctOptionIds={isQuiz ? q.correctAnswers : undefined}
+            onCorrectIdsChange={
+              isQuiz ? (ids) => onChange({ correctAnswers: ids }) : undefined
+            }
+            squareMarkers
+          />
+          {isQuiz ? <PointsField question={q} onChange={onChange} /> : null}
+        </>
       );
     case 'rating':
       return (

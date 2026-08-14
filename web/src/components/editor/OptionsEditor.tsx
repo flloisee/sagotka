@@ -6,16 +6,25 @@ export function OptionsEditor({
   onChange,
   correctOptionId,
   onCorrectChange,
+  correctOptionIds,
+  onCorrectIdsChange,
+  squareMarkers = false,
 }: {
   options: ChoiceOption[];
   onChange: (options: ChoiceOption[]) => void;
   correctOptionId?: string;
   onCorrectChange?: (optionId: string) => void;
+  correctOptionIds?: string[];
+  onCorrectIdsChange?: (optionIds: string[]) => void;
+  squareMarkers?: boolean;
 }) {
   const update = (id: string, label: string) =>
     onChange(options.map((o) => (o.id === id ? { ...o, label } : o)));
   const remove = (id: string) => {
     if (onCorrectChange && correctOptionId === id) onCorrectChange('');
+    if (onCorrectIdsChange && correctOptionIds?.includes(id)) {
+      onCorrectIdsChange(correctOptionIds.filter((x) => x !== id));
+    }
     onChange(options.filter((o) => o.id !== id));
   };
   const move = (index: number, dir: -1 | 1) => {
@@ -28,12 +37,27 @@ export function OptionsEditor({
   const add = () =>
     onChange([...options, { id: randomId(), label: `Option ${options.length + 1}` }]);
 
-  const marking = onCorrectChange !== undefined;
+  const marking = onCorrectChange !== undefined || onCorrectIdsChange !== undefined;
+  const markerRadius = squareMarkers ? 'rounded-[4px]' : 'rounded-full';
 
   return (
     <div className="mt-3 flex flex-col gap-1.5">
       {options.map((o, i) => {
-        const isCorrect = marking && o.id === correctOptionId;
+        const isCorrect =
+          onCorrectChange !== undefined
+            ? o.id === correctOptionId
+            : (correctOptionIds ?? []).includes(o.id);
+        const toggle = () => {
+          if (onCorrectChange !== undefined) {
+            onCorrectChange(isCorrect ? '' : o.id);
+          } else if (onCorrectIdsChange !== undefined) {
+            onCorrectIdsChange(
+              isCorrect
+                ? (correctOptionIds ?? []).filter((id) => id !== o.id)
+                : [...(correctOptionIds ?? []), o.id],
+            );
+          }
+        };
         return (
           <div key={o.id} className="group flex items-center gap-1.5">
             {marking ? (
@@ -41,8 +65,8 @@ export function OptionsEditor({
                 type="button"
                 aria-label={`Mark ${o.label || `option ${i + 1}`} as correct`}
                 title={isCorrect ? 'Correct answer' : 'Mark as correct answer'}
-                onClick={() => onCorrectChange!(isCorrect ? '' : o.id)}
-                className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                onClick={toggle}
+                className={`flex size-5 shrink-0 items-center justify-center ${markerRadius} border-2 transition-colors ${
                   isCorrect
                     ? 'border-success bg-success'
                     : 'border-rule-2 bg-paper hover:border-success'
@@ -57,7 +81,7 @@ export function OptionsEditor({
             ) : (
               <span
                 aria-hidden
-                className="flex size-4.5 shrink-0 items-center justify-center rounded-full border border-rule-2"
+                className={`flex size-4.5 shrink-0 items-center justify-center ${markerRadius} border border-rule-2`}
               />
             )}
             <input
