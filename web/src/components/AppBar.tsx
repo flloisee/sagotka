@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Moon, Sun } from 'lucide-react';
+import { Github, LogOut, Moon, Sun } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { IconButton } from './ui';
@@ -48,6 +48,16 @@ export function AppBar() {
           >
             {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
+          <a
+            href="https://github.com/flloisee/sagotka"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="View source on GitHub"
+            title="View source on GitHub"
+            className="inline-flex size-9 items-center justify-center rounded-full text-neutral transition-colors hover:bg-paper-3 hover:text-ink"
+          >
+            <Github className="size-4" />
+          </a>
           <span className="hidden items-center rounded-full bg-paper-3 px-3 py-1.5 text-[13px] font-medium text-ink-2 md:flex">
             {user?.email}
           </span>
