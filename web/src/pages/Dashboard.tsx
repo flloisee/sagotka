@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Copy, Eye, FilePlus2, GraduationCap, Search, Share2, Trash2, X } from 'lucide-react';
+import { BarChart3, FilePlus2, GraduationCap, Search, Share2, Trash2, Users, X } from 'lucide-react';
 import type { FormListItem, ShareGrant } from '@sagotka/shared';
 import { api } from '../api';
 import { useAuth } from '../auth';
@@ -217,15 +217,15 @@ function FormCard({
             aria-label="View responses"
             title="Responses"
           >
-            <Eye className="size-4" />
+            <BarChart3 className="size-4" />
           </Link>
           {isOwner ? (
             <>
-              <IconButton label="Share" onClick={(e) => { e.stopPropagation(); onShare(); }}>
-                <Share2 className="size-4" />
+              <IconButton label="Add collaborators" onClick={(e) => { e.stopPropagation(); onShare(); }}>
+                <Users className="size-4" />
               </IconButton>
               <IconButton label="Share link" onClick={(e) => { e.stopPropagation(); onCopy(); }}>
-                <Copy className="size-4" />
+                <Share2 className="size-4" />
               </IconButton>
               <IconButton label="Delete" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
                 <Trash2 className="size-4" />
